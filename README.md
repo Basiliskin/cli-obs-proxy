@@ -125,13 +125,19 @@ status. The charts update as new requests come in.
 
 ## Configuration
 
-The proxy reads two environment variables (set on the `proxy` service in `docker-compose.yml`):
+The proxy reads these environment variables (set on the `proxy` service in `docker-compose.yml`):
 
 | Variable | Default | Effect |
 |----------|---------|--------|
 | `DATABASE_URL` | `postgresql://cliobs:cliobs@postgres:5432/cliobs` | Postgres connection string used by both the proxy and the backend. |
 | `MAX_TOKEN_PARSE_BYTES` | `10000000` | Caps the body size the token parser will scan. Larger payloads are truncated head + tail. |
 | `ENABLE_OPENAI_USAGE_INJECTION` | `false` | Opt-in: rewrite OpenAI-compatible streaming requests to add `stream_options.include_usage: true` so the final usage chunk is emitted. |
+| `METRICS_IGNORE_PATHS` | `/favicon.ico` | Comma-separated paths that are never recorded — browser probes that would otherwise flood the table. |
+
+Body capture is controlled by mitmproxy's `stream_large_bodies` (set in `proxy/Dockerfile`, default
+`10m`). A streamed body is discarded and can never be parsed for token usage, so this threshold must
+stay above the response sizes you want tokenised. Note that setting it to `0` does **not** disable
+streaming — mitmproxy streams every body larger than the threshold, so `0` streams everything.
 
 Out of the box, no other configuration is required.
 
@@ -187,7 +193,7 @@ cd frontend && npm install && npm run dev
 # Proxy (run mitmdump against the local Python files)
 cd proxy
 DATABASE_URL="postgresql://cliobs:cliobs@localhost:5432/cliobs" \
-  mitmdump --listen-port 8080 -s addon.py --set stream_large_bodies=0
+  mitmdump --listen-port 8080 -s addon.py --set stream_large_bodies=10m
 ```
 
 The Vite dev server runs on `http://localhost:5173`, which is already in the backend's CORS

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from datetime import datetime, timezone
 
 from mitmproxy import http
@@ -11,6 +12,15 @@ from tokens import extract_token_usage, maybe_inject_openai_stream_usage
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+# Paths that carry no observability value but arrive in high volume (browser
+# probes such as /favicon.ico). Recorded metrics are dropped for these.
+IGNORED_PATHS = {
+    entry.strip()
+    for entry in os.getenv("METRICS_IGNORE_PATHS", "/favicon.ico").split(",")
+    if entry.strip()
+}
 
 
 def _get_length(content: bytes | None, headers) -> int:
@@ -60,6 +70,9 @@ class ObservabilityAddon:
 
         # Strip query params to avoid leaking API keys/tokens in logs.
         path = req.path.split("?", 1)[0]
+
+        if path in IGNORED_PATHS:
+            return
 
         # Calculate duration.
         duration_ms = None

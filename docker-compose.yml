@@ -23,6 +23,7 @@ services:
       DATABASE_URL: "postgresql://cliobs:cliobs@postgres:5432/cliobs"
       MAX_TOKEN_PARSE_BYTES: "10000000"
       ENABLE_OPENAI_USAGE_INJECTION: "false"
+      METRICS_IGNORE_PATHS: "/favicon.ico"
     volumes:
       # HOME=/root in this image, so mitmproxy writes its CA to /root/.mitmproxy
       - mitmproxy_certs:/root/.mitmproxy

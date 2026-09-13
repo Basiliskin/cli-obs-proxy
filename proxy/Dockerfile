@@ -11,6 +11,7 @@ COPY db.py tokens.py addon.py /app/
 
 EXPOSE 8080
 
-# stream_large_bodies=0 keeps bodies available for token parsing.
-# If your mitmproxy version complains about this option, remove that --set flag.
-CMD ["mitmdump", "--listen-host", "0.0.0.0", "--listen-port", "8080", "-s", "/app/addon.py", "--set", "stream_large_bodies=0"]
+# Bodies must stay buffered for the token parser to see them: a streamed body is
+# discarded entirely and can never be parsed. mitmproxy streams anything larger
+# than this threshold; unset means "never stream". 10m matches MAX_TOKEN_PARSE_BYTES.
+CMD ["mitmdump", "--listen-host", "0.0.0.0", "--listen-port", "8080", "-s", "/app/addon.py", "--set", "stream_large_bodies=10m"]

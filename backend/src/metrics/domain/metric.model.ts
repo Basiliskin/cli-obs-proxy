@@ -20,8 +20,10 @@ export class HttpMetric {
   @Field(() => Int, { nullable: true })
   status!: number;
 
-  @Field(() => Int)
-  duration_ms!: number;
+  // Nullable: the recorder cannot compute a duration when no response arrived
+  // (client disconnect, DNS/TLS failure), so the column is nullable in the DB.
+  @Field(() => Int, { nullable: true })
+  duration_ms!: number | null;
 
   @Field({ nullable: true })
   model!: string;
