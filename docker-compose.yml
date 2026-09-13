@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -26,7 +24,8 @@ services:
       MAX_TOKEN_PARSE_BYTES: "10000000"
       ENABLE_OPENAI_USAGE_INJECTION: "false"
     volumes:
-      - mitmproxy_certs:/home/root/.mitmproxy
+      # HOME=/root in this image, so mitmproxy writes its CA to /root/.mitmproxy
+      - mitmproxy_certs:/root/.mitmproxy
     depends_on:
       postgres:
         condition: service_healthy

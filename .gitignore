@@ -15,6 +15,13 @@ dist
 dist-ssr
 *.local
 
+# mitmproxy CA certs — extracted locally from the proxy container, machine-specific
+mitmproxy-ca-cert.pem
+mitmproxy-ca-cert.cer
+mitmproxy-ca-cert.p12
+mitmproxy-ca.pem
+mitmproxy-dhparam.pem
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

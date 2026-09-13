@@ -1,19 +1,18 @@
 1. docker compose up -d --build (docker compose down)
-2. Copy the cert from the Docker volume to your local machine:
+2. Copy the cert out of the running proxy container:
 
 ```
-# Find the exact volume name (usually cli-obs-proxy_mitmproxy_certs)
-VOLUME_NAME=$(docker volume ls -q | grep mitmproxy_certs)
-
-# Copy the cert out
-docker run --rm -v "$VOLUME_NAME":/certs -v "$PWD":/local alpine cp /certs/mitmproxy-ca-cert.pem /local/
-
+docker compose cp proxy:/root/.mitmproxy/mitmproxy-ca-cert.pem ./mitmproxy-ca-cert.pem
 ```
+
+The cert lives in the `mitmproxy_certs` volume, mounted at `/root/.mitmproxy` — root's
+home directory, since the image runs as root. (`docker compose cp` needs the proxy
+container to be running.)
 
 3. Add it to your macOS Keychain and trust it:
 
 ```
-security add-trusted-cert -d -r trustRoot -k ~/Library/Keychains/login.keychain-db ~/dev/cli-obs-proxy/mitmproxy-ca-cert.pem
+security add-trusted-cert -d -r trustRoot -k ~/Library/Keychains/login.keychain-db ~/workspace/cli-obs-proxy/mitmproxy-ca-cert.pem
 ```
 
 4. add to ~/.zshrc
@@ -37,7 +36,7 @@ llmobs() {
   fi
 
   local proxy="http://127.0.0.1:8080"
-  local ca="$HOME/dev/cli-obs-proxy/mitmproxy-ca-cert.pem"
+  local ca="$HOME/workspace/cli-obs-proxy/mitmproxy-ca-cert.pem"
 
   if [[ ! -f "$ca" ]]; then
     echo "llmobs: missing MITM CA certificate: $ca" >&2
@@ -47,7 +46,7 @@ llmobs() {
 
   if command -v nc >/dev/null 2>&1 && ! nc -z 127.0.0.1 8080 >/dev/null 2>&1; then
     echo "llmobs: proxy is not listening on 127.0.0.1:8080" >&2
-    echo "Start it with: cd ~/dev/cli-obs-proxy && docker compose up -d" >&2
+    echo "Start it with: cd ~/workspace/cli-obs-proxy && docker compose up -d" >&2
     return 1
   fi
 
@@ -82,8 +81,8 @@ llmobs() {
 }
 
 # Optional convenience aliases.
-alias llmobs-up='docker compose -f "$HOME/dev/cli-obs-proxy/docker-compose.yml" up -d'
-alias llmobs-logs='docker compose -f "$HOME/dev/cli-obs-proxy/docker-compose.yml" logs -f proxy'
+alias llmobs-up='docker compose -f "$HOME/workspace/cli-obs-proxy/docker-compose.yml" up -d'
+alias llmobs-logs='docker compose -f "$HOME/workspace/cli-obs-proxy/docker-compose.yml" logs -f proxy'
 alias claudeobs='llmobs claude'
 # --- end LLM observability wrapper ---
 
