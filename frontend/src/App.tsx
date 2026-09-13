@@ -1,76 +1,128 @@
 import { useQuery } from "@apollo/client/react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { TokenChart } from "./components/TokenChart";
 import { MetricsTable } from "./components/MetricsTable";
 import { UsageOverview } from "./components/UsageOverview";
-import { GET_RECENT_METRICS } from "./queries";
+import { LiveStatus } from "./components/LiveStatus";
+import { GET_METRIC_FACETS, GET_RECENT_METRICS } from "./queries";
+import type {
+  MetricFacets,
+  MetricFilters,
+  RecentMetric,
+  TrafficMode,
+} from "./metrics";
+import {
+  ALL,
+  FACET_POLL_INTERVAL_MS,
+  POLL_INTERVAL_MS,
+  RECENT_LIMIT,
+  initialFilters,
+  toFacetInput,
+  toFilterInput,
+} from "./metrics";
 
-export interface RecentMetric {
-  id: string;
-  observed_at: string;
-  host: string;
-  model: string | null;
-  status: number | null;
-  duration_ms: number;
-  input_tokens: number | null;
-  output_tokens: number | null;
+/**
+ * Keeps the active selection present in the dropdown even when the facet list
+ * does not contain it (facets failed, or lag behind a fresh selection).
+ * Without this the <select> would render blank while the table stays filtered
+ * by that value — which reads as broken filtering.
+ */
+function withSelection(options: string[], selected: string): string[] {
+  return selected !== ALL && !options.includes(selected)
+    ? [selected, ...options]
+    : options;
 }
 
 interface RecentMetricsData {
   recentMetrics: RecentMetric[];
 }
 
-export interface MetricFilters {
-  search: string;
-  host: string;
-  model: string;
-  status: string;
+interface FacetsData {
+  metricFacets: MetricFacets;
 }
 
-const initialFilters: MetricFilters = {
-  search: "",
-  host: "all",
-  model: "all",
-  status: "all",
-};
+const trafficOptions: { value: TrafficMode; label: string }[] = [
+  { value: "llm", label: "LLM traffic" },
+  { value: "all", label: "All traffic" },
+];
 
 function App() {
-  const [filters, setFilters] = useState(initialFilters);
-  const { data, loading, error } = useQuery<RecentMetricsData>(
+  const [filters, setFilters] = useState<MetricFilters>(initialFilters);
+
+  const filterInput = useMemo(() => toFilterInput(filters), [filters]);
+  const facetInput = useMemo(() => toFacetInput(filters), [filters]);
+
+  // Filtering happens server-side, so `recentMetrics` is already the filtered
+  // set; polling keeps it live without a page reload.
+  const { data, loading, error, networkStatus } = useQuery<RecentMetricsData>(
     GET_RECENT_METRICS,
-    { variables: { limit: 100 } },
+    {
+      variables: { limit: RECENT_LIMIT, filters: filterInput },
+      pollInterval: POLL_INTERVAL_MS,
+      fetchPolicy: "network-only",
+      // LiveStatus renders `networkStatus`, which only reaches this component
+      // while this is on. It defaults to true today, but the badge would freeze
+      // silently if a future perf pass turned it off — so it is set explicitly.
+      notifyOnNetworkStatusChange: true,
+      // A backgrounded tab has nobody watching it, and the proxy ingests
+      // continuously; don't keep querying for it.
+      skipPollAttempt: () => document.hidden,
+    },
   );
+
+  // Dropdown options come from the whole filtered scope, not just the visible
+  // page — otherwise a host outside the last N requests could never be selected.
+  // Polled far more slowly than the table; see FACET_POLL_INTERVAL_MS.
+  const { data: facetData, error: facetError } = useQuery<FacetsData>(
+    GET_METRIC_FACETS,
+    {
+      variables: { filters: facetInput },
+      pollInterval: FACET_POLL_INTERVAL_MS,
+      fetchPolicy: "network-only",
+      skipPollAttempt: () => document.hidden,
+    },
+  );
+
   const metrics = data?.recentMetrics ?? [];
-  const filteredMetrics = metrics.filter((metric) => {
-    const query = filters.search.toLowerCase();
-    const matchesSearch = [metric.host, metric.model ?? ""]
-      .join(" ")
-      .toLowerCase()
-      .includes(query);
-    const matchesHost = filters.host === "all" || metric.host === filters.host;
-    const matchesModel =
-      filters.model === "all" || metric.model === filters.model;
-    const matchesStatus =
-      filters.status === "all" || String(metric.status) === filters.status;
-    return matchesSearch && matchesHost && matchesModel && matchesStatus;
-  });
-  const hosts = [...new Set(metrics.map((metric) => metric.host))];
-  const models = [
-    ...new Set(
-      metrics
-        .map((metric) => metric.model)
-        .filter((model): model is string => Boolean(model)),
-    ),
-  ];
-  const statuses = [
-    ...new Set(
-      metrics
-        .map((metric) => metric.status)
-        .filter((status): status is number => status !== null),
-    ),
-  ];
+  const hosts = withSelection(
+    facetData?.metricFacets.hosts ?? [],
+    filters.host,
+  );
+  const models = withSelection(
+    facetData?.metricFacets.models ?? [],
+    filters.model,
+  );
+  const statuses = withSelection(
+    (facetData?.metricFacets.statuses ?? []).map(String),
+    filters.status,
+  );
+
+  // The dashboard can only attest to what it can reach: the API, and the newest
+  // request it can see. It has no independent view of proxy health.
+  const degraded = Boolean(error) || Boolean(facetError);
+  const newestRequest = metrics.length
+    ? new Date(metrics[0].observed_at).toLocaleTimeString()
+    : null;
+
   const updateFilter = (key: keyof MetricFilters, value: string) =>
     setFilters((current) => ({ ...current, [key]: value }));
+
+  // Field filters are scoped to the traffic mode they were picked under, so
+  // switching modes clears them rather than landing on a guaranteed-empty view.
+  const setTraffic = (traffic: TrafficMode) =>
+    setFilters((current) => ({
+      ...current,
+      traffic,
+      host: ALL,
+      model: ALL,
+      status: ALL,
+    }));
+
+  const hasActiveFilters =
+    filters.search !== "" ||
+    filters.host !== ALL ||
+    filters.model !== ALL ||
+    filters.status !== ALL;
 
   return (
     <div className="app-shell">
@@ -82,9 +134,7 @@ function App() {
             <h1>CLI LLM Observability</h1>
           </div>
         </div>
-        <div className="live-status">
-          <span /> Live monitoring
-        </div>
+        <LiveStatus networkStatus={networkStatus} />
       </header>
       <main>
         <section className="intro-row">
@@ -96,9 +146,23 @@ function App() {
               focused view.
             </p>
           </div>
-          <div className="metric-count">
-            <strong>{filteredMetrics.length}</strong>
-            <span>visible requests</span>
+          <div className="intro-scope">
+            <div className="segmented" role="group" aria-label="Traffic scope">
+              {trafficOptions.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  aria-pressed={filters.traffic === option.value}
+                  onClick={() => setTraffic(option.value)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            <div className="metric-count">
+              <strong>{metrics.length}</strong>
+              <span>visible requests</span>
+            </div>
           </div>
         </section>
         <section className="filter-bar" aria-label="Filter requests">
@@ -117,7 +181,7 @@ function App() {
               value={filters.host}
               onChange={(event) => updateFilter("host", event.target.value)}
             >
-              <option value="all">All hosts</option>
+              <option value={ALL}>All hosts</option>
               {hosts.map((host) => (
                 <option key={host} value={host}>
                   {host}
@@ -131,7 +195,7 @@ function App() {
               value={filters.model}
               onChange={(event) => updateFilter("model", event.target.value)}
             >
-              <option value="all">All models</option>
+              <option value={ALL}>All models</option>
               {models.map((model) => (
                 <option key={model} value={model}>
                   {model}
@@ -145,7 +209,7 @@ function App() {
               value={filters.status}
               onChange={(event) => updateFilter("status", event.target.value)}
             >
-              <option value="all">Any status</option>
+              <option value={ALL}>Any status</option>
               {statuses.map((status) => (
                 <option key={status} value={status}>
                   {status}
@@ -161,22 +225,31 @@ function App() {
             Clear
           </button>
         </section>
-        <UsageOverview metrics={filteredMetrics} />
+        <UsageOverview metrics={metrics} />
         <div className="dashboard-grid">
-          <TokenChart />
-          <section className="health-panel">
-            <p className="eyebrow">System health</p>
+          <TokenChart filters={filterInput} />
+          <section className={`health-panel${degraded ? " degraded" : ""}`}>
+            <p className="eyebrow">API status</p>
             <div className="health-value">
               <span className="health-dot" />
-              Operational
+              {degraded ? "Degraded" : "Operational"}
             </div>
-            <p>Requests are flowing through the proxy normally.</p>
+            <p>
+              {degraded
+                ? "The metrics API is unreachable — what you see may be stale."
+                : newestRequest
+                  ? `Polling every ${POLL_INTERVAL_MS / 1000}s · newest request at ${newestRequest}.`
+                  : `Polling every ${POLL_INTERVAL_MS / 1000}s · no requests yet in this scope.`}
+            </p>
           </section>
         </div>
         <MetricsTable
-          metrics={filteredMetrics}
-          loading={loading}
-          error={Boolean(error)}
+          metrics={metrics}
+          loading={loading && !data}
+          // A failed *poll* keeps the last good rows on screen (LiveStatus flags
+          // them as stale); only a failure with nothing to show is an error state.
+          error={Boolean(error) && !data}
+          hasActiveFilters={hasActiveFilters}
         />
       </main>
     </div>

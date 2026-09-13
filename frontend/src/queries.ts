@@ -1,8 +1,8 @@
 import { gql } from "@apollo/client";
 
 export const GET_RECENT_METRICS = gql`
-  query GetRecentMetrics($limit: Int!) {
-    recentMetrics(limit: $limit) {
+  query GetRecentMetrics($limit: Int!, $filters: MetricFiltersInput) {
+    recentMetrics(limit: $limit, filters: $filters) {
       id
       observed_at
       method
@@ -19,12 +19,22 @@ export const GET_RECENT_METRICS = gql`
 `;
 
 export const GET_MODEL_USAGE = gql`
-  query GetModelUsage {
-    modelUsage {
+  query GetModelUsage($filters: MetricFiltersInput) {
+    modelUsage(filters: $filters) {
       model
       request_count
       total_input_tokens
       total_output_tokens
+    }
+  }
+`;
+
+export const GET_METRIC_FACETS = gql`
+  query GetMetricFacets($filters: MetricFiltersInput) {
+    metricFacets(filters: $filters) {
+      hosts
+      models
+      statuses
     }
   }
 `;

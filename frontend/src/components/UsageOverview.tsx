@@ -6,7 +6,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { RecentMetric } from "../App";
+import type { RecentMetric } from "../metrics";
+import { RECENT_LIMIT } from "../metrics";
 
 interface UsageOverviewProps {
   metrics: RecentMetric[];
@@ -19,8 +20,11 @@ interface TrendPoint {
 
 const weekdayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
+// Bucketed in UTC to match getTrend's `toISOString().slice(0, 10)`. Using the
+// local day here instead made the trend and the heatmap disagree about which
+// day a request belonged to.
 function dayIndex(date: Date) {
-  return (date.getDay() + 6) % 7;
+  return (date.getUTCDay() + 6) % 7;
 }
 
 function getTrend(metrics: RecentMetric[]): TrendPoint[] {
@@ -52,7 +56,7 @@ function getHeatmap(metrics: RecentMetric[]) {
 
   metrics.forEach((metric) => {
     const date = new Date(metric.observed_at);
-    const period = Math.min(11, Math.floor((date.getDate() - 1) / 3));
+    const period = Math.min(11, Math.floor((date.getUTCDate() - 1) / 3));
     const tokens = (metric.input_tokens ?? 0) + (metric.output_tokens ?? 0);
     cells[dayIndex(date)].values[period] += tokens;
   });
@@ -81,20 +85,27 @@ export function UsageOverview({ metrics }: UsageOverviewProps) {
     ),
   ).size;
 
+  // Every figure below is derived from the request page in view, not from the
+  // whole table, so the copy says so rather than implying a server-side total.
+  const scope =
+    metrics.length >= RECENT_LIMIT
+      ? `Newest ${RECENT_LIMIT} requests in view`
+      : `${metrics.length} requests in view`;
+
   return (
     <section className="usage-overview">
       <div className="usage-kpis">
         <div>
           <strong>{formatTokens(totalTokens)}</strong>
-          <span>Visible tokens</span>
+          <span>Tokens in view</span>
         </div>
         <div>
-          <strong>{formatTokens(totalTokens * 7)}</strong>
-          <span>Projected 7 days</span>
+          <strong>{formatTokens(peakTokens)}</strong>
+          <span>Peak day</span>
         </div>
         <div>
           <strong>{activeDays}</strong>
-          <span>Active days</span>
+          <span>Days in view</span>
         </div>
       </div>
       <div className="usage-panels">
@@ -104,9 +115,7 @@ export function UsageOverview({ metrics }: UsageOverviewProps) {
               <p className="eyebrow">Recent activity</p>
               <h2>Usage trend</h2>
             </div>
-            <span>
-              {metrics.length ? "Last 7 active days" : "Waiting for requests"}
-            </span>
+            <span>{metrics.length ? scope : "Waiting for requests"}</span>
           </div>
           {trend.length ? (
             <ResponsiveContainer width="100%" height={240}>
@@ -154,7 +163,7 @@ export function UsageOverview({ metrics }: UsageOverviewProps) {
               <p className="eyebrow">Request rhythm</p>
               <h2>Usage heatmap</h2>
             </div>
-            <span>Recent 36 days</span>
+            <span>{scope}</span>
           </div>
           <div className="heatmap-grid">
             <div className="heatmap-days">
@@ -189,16 +198,16 @@ export function UsageOverview({ metrics }: UsageOverviewProps) {
         </section>
         <aside className="usage-summary">
           <div>
-            <strong>{formatTokens(totalTokens)}</strong>
-            <span>Total tokens</span>
-          </div>
-          <div>
             <strong>{formatTokens(peakTokens)}</strong>
             <span>Peak day</span>
           </div>
           <div>
+            <strong>{metrics.length}</strong>
+            <span>Requests in view</span>
+          </div>
+          <div>
             <strong>{activeDays}</strong>
-            <span>Active days</span>
+            <span>Days in view</span>
           </div>
         </aside>
       </div>

@@ -52,3 +52,31 @@ export class ModelUsageAggregate {
   @Field(() => Int)
   total_output_tokens!: number;
 }
+
+/**
+ * Plain domain filter shape — deliberately not a GraphQL type. The transport-level
+ * input lives in the interface layer and is mapped onto this, so the application
+ * layer never depends on an untrusted-input DTO.
+ */
+export interface MetricFilters {
+  /** Restrict to rows that produced token usage (non-LLM proxy noise is stored with model = NULL). */
+  llmOnly?: boolean;
+  /** Case-insensitive substring match across host and model. */
+  search?: string;
+  host?: string;
+  model?: string;
+  status?: number;
+}
+
+/** Distinct values present in the current traffic scope, used to populate the filter dropdowns. */
+@ObjectType()
+export class MetricFacets {
+  @Field(() => [String])
+  hosts!: string[];
+
+  @Field(() => [String])
+  models!: string[];
+
+  @Field(() => [Int])
+  statuses!: number[];
+}

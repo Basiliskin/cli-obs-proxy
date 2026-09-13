@@ -21,6 +21,26 @@ type HttpMetric {
   total_tokens: Int
 }
 
+type MetricFacets {
+  hosts: [String!]!
+  models: [String!]!
+  statuses: [Int!]!
+}
+
+input MetricFiltersInput {
+  host: String
+
+  """
+  Restrict to requests that produced token usage, hiding non-LLM proxy traffic.
+  """
+  llmOnly: Boolean
+  model: String
+
+  """Case-insensitive substring match across host and model."""
+  search: String
+  status: Int
+}
+
 type ModelUsageAggregate {
   model: String!
   request_count: Int!
@@ -29,6 +49,10 @@ type ModelUsageAggregate {
 }
 
 type Query {
-  modelUsage: [ModelUsageAggregate!]!
-  recentMetrics(limit: Int! = 50): [HttpMetric!]!
+  """
+  Distinct hosts, models and statuses for the current traffic mode, used to populate the filter dropdowns.
+  """
+  metricFacets(filters: MetricFiltersInput): MetricFacets!
+  modelUsage(filters: MetricFiltersInput): [ModelUsageAggregate!]!
+  recentMetrics(filters: MetricFiltersInput, limit: Int! = 50): [HttpMetric!]!
 }
