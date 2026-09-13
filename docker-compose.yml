@@ -23,21 +23,30 @@ services:
       - "8080:8080"
     environment:
       DATABASE_URL: "postgresql://cliobs:cliobs@postgres:5432/cliobs"
-
-      # Maximum response body size used for token parsing.
-      # For larger bodies, the parser keeps beginning + end only.
       MAX_TOKEN_PARSE_BYTES: "10000000"
-
-      # Disabled by default.
-      # Set to true only if your OpenAI-compatible provider supports:
-      # stream_options.include_usage
-      ENABLE_OPENAI_USAGE_INJECTION: "true"
-
+      ENABLE_OPENAI_USAGE_INJECTION: "false"
     volumes:
       - mitmproxy_certs:/home/root/.mitmproxy
     depends_on:
       postgres:
         condition: service_healthy
+
+  backend:
+    build: ./backend
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: "postgresql://cliobs:cliobs@postgres:5432/cliobs"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
 
 volumes:
   pgdata:

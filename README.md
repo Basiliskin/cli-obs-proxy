@@ -1,4 +1,4 @@
-1. docker compose up -d --build
+1. docker compose up -d --build (docker compose down)
 2. Copy the cert from the Docker volume to your local machine:
 
 ```
