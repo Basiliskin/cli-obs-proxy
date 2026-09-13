@@ -2,6 +2,7 @@ import { useQuery } from "@apollo/client/react";
 import { useState } from "react";
 import { TokenChart } from "./components/TokenChart";
 import { MetricsTable } from "./components/MetricsTable";
+import { UsageOverview } from "./components/UsageOverview";
 import { GET_RECENT_METRICS } from "./queries";
 
 export interface RecentMetric {
@@ -160,6 +161,7 @@ function App() {
             Clear
           </button>
         </section>
+        <UsageOverview metrics={filteredMetrics} />
         <div className="dashboard-grid">
           <TokenChart />
           <section className="health-panel">
