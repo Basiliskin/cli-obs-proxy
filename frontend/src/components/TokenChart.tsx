@@ -23,13 +23,23 @@ interface ModelUsageData {
 export function TokenChart() {
   const { data, loading } = useQuery<ModelUsageData>(GET_MODEL_USAGE);
 
-  if (loading) return <p>Loading chart...</p>;
+  if (loading)
+    return (
+      <section className="chart-panel empty-state">Loading chart...</section>
+    );
   if (!data?.modelUsage?.length)
-    return <p>No token data yet. Run some LLM requests!</p>;
+    return (
+      <section className="chart-panel empty-state">
+        <div>
+          <p className="eyebrow">Token usage</p>
+          <p>No token data yet. Run some LLM requests!</p>
+        </div>
+      </section>
+    );
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow mb-8">
-      <h2 className="text-xl font-bold mb-4">Token Usage by Model</h2>
+    <section className="chart-panel">
+      <h2>Token usage by model</h2>
       <ResponsiveContainer width="100%" height={300}>
         <BarChart data={data.modelUsage}>
           <XAxis dataKey="model" />
@@ -48,6 +58,6 @@ export function TokenChart() {
           />
         </BarChart>
       </ResponsiveContainer>
-    </div>
+    </section>
   );
 }
