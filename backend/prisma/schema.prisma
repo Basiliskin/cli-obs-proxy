@@ -1,0 +1,30 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model HttpMetric {
+  id              BigInt    @id @default(autoincrement())
+  observed_at     DateTime  @db.Timestamptz
+  method          String
+  scheme          String
+  host            String
+  port            Int
+  path            String
+  status          Int?
+  request_bytes   Int
+  response_bytes  Int
+  duration_ms     Int?
+  error           String?
+  model           String?
+  input_tokens    Int?
+  output_tokens   Int?
+  total_tokens    Int?
+  token_source    String?
+
+  @@map("http_metrics")
+}
