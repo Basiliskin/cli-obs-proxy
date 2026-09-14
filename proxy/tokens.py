@@ -23,6 +23,12 @@ class TokenUsage:
     input_tokens: Optional[int]
     output_tokens: Optional[int]
     total_tokens: Optional[int]
+    # Anthropic prompt-caching breakdown. `input_tokens` on its own hides where
+    # the bytes actually go: cache writes (creation) vs. cache hits (read) vs.
+    # tokens that missed the cache entirely. Both are None for providers/paths
+    # that don't report them, which is distinct from "zero".
+    cache_creation_input_tokens: Optional[int]
+    cache_read_input_tokens: Optional[int]
     source: Optional[str]
 
 
@@ -89,20 +95,31 @@ def _iter_sse_json(text: str):
             yield obj
 
 
-def _usage_tuple_from_dict(
-    obj: Any,
-) -> Optional[tuple[Optional[int], Optional[int], Optional[int]]]:
+@dataclass(frozen=True, slots=True)
+class _UsageFields:
+    input_tokens: Optional[int]
+    output_tokens: Optional[int]
+    total_tokens: Optional[int]
+    cache_creation_input_tokens: Optional[int]
+    cache_read_input_tokens: Optional[int]
+
+
+def _usage_tuple_from_dict(obj: Any) -> Optional[_UsageFields]:
     """
     Supports:
 
     Anthropic:
       usage.input_tokens
       usage.output_tokens
+      usage.cache_creation_input_tokens  (tokens written to the prompt cache)
+      usage.cache_read_input_tokens      (tokens served from the prompt cache)
 
     OpenAI:
       usage.prompt_tokens
       usage.completion_tokens
       usage.total_tokens
+      usage.prompt_tokens_details.cached_tokens (mapped to cache_read, the
+        closest analog: tokens served from OpenAI's own prompt cache)
     """
     if not isinstance(obj, dict):
         return None
@@ -124,10 +141,30 @@ def _usage_tuple_from_dict(
     if total_tokens is None and (input_tokens is not None or output_tokens is not None):
         total_tokens = (input_tokens or 0) + (output_tokens or 0)
 
-    if input_tokens is None and output_tokens is None and total_tokens is None:
+    cache_creation_input_tokens = _int(usage.get("cache_creation_input_tokens"))
+    cache_read_input_tokens = _int(usage.get("cache_read_input_tokens"))
+
+    if cache_read_input_tokens is None:
+        prompt_details = usage.get("prompt_tokens_details")
+        if isinstance(prompt_details, dict):
+            cache_read_input_tokens = _int(prompt_details.get("cached_tokens"))
+
+    if (
+        input_tokens is None
+        and output_tokens is None
+        and total_tokens is None
+        and cache_creation_input_tokens is None
+        and cache_read_input_tokens is None
+    ):
         return None
 
-    return input_tokens, output_tokens, total_tokens
+    return _UsageFields(
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        total_tokens=total_tokens,
+        cache_creation_input_tokens=cache_creation_input_tokens,
+        cache_read_input_tokens=cache_read_input_tokens,
+    )
 
 
 def _extract_non_stream(obj: Any) -> Optional[TokenUsage]:
@@ -143,9 +180,11 @@ def _extract_non_stream(obj: Any) -> Optional[TokenUsage]:
     if usage:
         return TokenUsage(
             model=model,
-            input_tokens=usage[0],
-            output_tokens=usage[1],
-            total_tokens=usage[2],
+            input_tokens=usage.input_tokens,
+            output_tokens=usage.output_tokens,
+            total_tokens=usage.total_tokens,
+            cache_creation_input_tokens=usage.cache_creation_input_tokens,
+            cache_read_input_tokens=usage.cache_read_input_tokens,
             source="response_usage",
         )
 
@@ -159,9 +198,11 @@ def _extract_non_stream(obj: Any) -> Optional[TokenUsage]:
         if usage:
             return TokenUsage(
                 model=model,
-                input_tokens=usage[0],
-                output_tokens=usage[1],
-                total_tokens=usage[2],
+                input_tokens=usage.input_tokens,
+                output_tokens=usage.output_tokens,
+                total_tokens=usage.total_tokens,
+                cache_creation_input_tokens=usage.cache_creation_input_tokens,
+                cache_read_input_tokens=usage.cache_read_input_tokens,
                 source="response_usage",
             )
 
@@ -174,6 +215,8 @@ def _extract_sse(text: str) -> Optional[TokenUsage]:
 
     Anthropic streaming:
       message_start.message.usage.input_tokens
+      message_start.message.usage.cache_creation_input_tokens
+      message_start.message.usage.cache_read_input_tokens
       message_delta.usage.output_tokens
 
     OpenAI streaming:
@@ -183,6 +226,8 @@ def _extract_sse(text: str) -> Optional[TokenUsage]:
     input_tokens: Optional[int] = None
     output_tokens: Optional[int] = None
     total_tokens: Optional[int] = None
+    cache_creation_input_tokens: Optional[int] = None
+    cache_read_input_tokens: Optional[int] = None
     model: Optional[str] = None
     found = False
 
@@ -195,7 +240,9 @@ def _extract_sse(text: str) -> Optional[TokenUsage]:
 
         obj_type = obj.get("type")
 
-        # Anthropic streaming start.
+        # Anthropic streaming start. This is the only event carrying the
+        # cache-creation/cache-read split — message_delta only ever reports
+        # cumulative output_tokens.
         if obj_type == "message_start":
             message = obj.get("message")
             if isinstance(message, dict):
@@ -206,6 +253,8 @@ def _extract_sse(text: str) -> Optional[TokenUsage]:
                 if isinstance(usage, dict):
                     it = _int(usage.get("input_tokens"))
                     ot = _int(usage.get("output_tokens"))
+                    cc = _int(usage.get("cache_creation_input_tokens"))
+                    cr = _int(usage.get("cache_read_input_tokens"))
 
                     if it is not None:
                         input_tokens = it
@@ -217,6 +266,14 @@ def _extract_sse(text: str) -> Optional[TokenUsage]:
                             if output_tokens is None
                             else max(output_tokens, ot)
                         )
+                        found = True
+
+                    if cc is not None:
+                        cache_creation_input_tokens = cc
+                        found = True
+
+                    if cr is not None:
+                        cache_read_input_tokens = cr
                         found = True
 
         # Anthropic streaming delta/final usage.
@@ -241,20 +298,21 @@ def _extract_sse(text: str) -> Optional[TokenUsage]:
         # OpenAI / generic streaming chunk usage.
         chunk_usage = _usage_tuple_from_dict(obj)
         if chunk_usage:
-            it, ot, tt = chunk_usage
+            if chunk_usage.input_tokens is not None:
+                input_tokens = chunk_usage.input_tokens
 
-            if it is not None:
-                input_tokens = it
-
-            if ot is not None:
+            if chunk_usage.output_tokens is not None:
                 output_tokens = (
-                    ot
+                    chunk_usage.output_tokens
                     if output_tokens is None
-                    else max(output_tokens, ot)
+                    else max(output_tokens, chunk_usage.output_tokens)
                 )
 
-            if tt is not None:
-                total_tokens = tt
+            if chunk_usage.total_tokens is not None:
+                total_tokens = chunk_usage.total_tokens
+
+            if chunk_usage.cache_read_input_tokens is not None:
+                cache_read_input_tokens = chunk_usage.cache_read_input_tokens
 
             found = True
 
@@ -269,6 +327,8 @@ def _extract_sse(text: str) -> Optional[TokenUsage]:
         input_tokens=input_tokens,
         output_tokens=output_tokens,
         total_tokens=total_tokens,
+        cache_creation_input_tokens=cache_creation_input_tokens,
+        cache_read_input_tokens=cache_read_input_tokens,
         source="sse_usage",
     )
 
@@ -319,6 +379,8 @@ def extract_token_usage(
             input_tokens=usage.input_tokens,
             output_tokens=usage.output_tokens,
             total_tokens=usage.total_tokens,
+            cache_creation_input_tokens=usage.cache_creation_input_tokens,
+            cache_read_input_tokens=usage.cache_read_input_tokens,
             source=usage.source,
         )
 

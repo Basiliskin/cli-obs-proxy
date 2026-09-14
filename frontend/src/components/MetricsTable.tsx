@@ -1,4 +1,5 @@
 import type { RecentMetric } from "../metrics";
+import { formatTokens } from "../metrics";
 
 interface MetricsTableProps {
   metrics: RecentMetric[];
@@ -55,7 +56,10 @@ export function MetricsTable({
                 <th>Model</th>
                 <th>Status</th>
                 <th>Duration</th>
-                <th>Tokens (In/Out)</th>
+                <th>Input</th>
+                <th>Cache Create</th>
+                <th>Cache Read</th>
+                <th>Output</th>
                 <th>Inspect</th>
               </tr>
             </thead>
@@ -73,10 +77,21 @@ export function MetricsTable({
                     </span>
                   </td>
                   <td>{m.duration_ms === null ? "-" : `${m.duration_ms}ms`}</td>
-                  <td>
-                    {m.input_tokens
-                      ? `${m.input_tokens} / ${m.output_tokens}`
-                      : "-"}
+                  <td title={m.input_tokens?.toString()}>
+                    {m.input_tokens === null ? "-" : formatTokens(m.input_tokens)}
+                  </td>
+                  <td title={m.cache_creation_input_tokens?.toString()}>
+                    {m.cache_creation_input_tokens === null
+                      ? "-"
+                      : formatTokens(m.cache_creation_input_tokens)}
+                  </td>
+                  <td title={m.cache_read_input_tokens?.toString()}>
+                    {m.cache_read_input_tokens === null
+                      ? "-"
+                      : formatTokens(m.cache_read_input_tokens)}
+                  </td>
+                  <td title={m.output_tokens?.toString()}>
+                    {m.output_tokens === null ? "-" : formatTokens(m.output_tokens)}
                   </td>
                   <td>
                     <button

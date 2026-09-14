@@ -12,6 +12,8 @@ export interface RecentMetric {
   duration_ms: number | null;
   input_tokens: number | null;
   output_tokens: number | null;
+  cache_creation_input_tokens: number | null;
+  cache_read_input_tokens: number | null;
   has_details: boolean;
 }
 
@@ -94,3 +96,11 @@ export const POLL_INTERVAL_MS = 3000;
 export const FACET_POLL_INTERVAL_MS = 30000;
 
 export const RECENT_LIMIT = 100;
+
+/** Compact token count: 1_100 -> "1.1K", 500_000 -> "0.5M", 100_000_000_000 -> "0.1B". */
+export function formatTokens(value: number) {
+  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1)}B`;
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
+  return String(value);
+}

@@ -132,6 +132,12 @@ class ObservabilityAddon:
                 input_tokens=usage.input_tokens if usage else None,
                 output_tokens=usage.output_tokens if usage else None,
                 total_tokens=usage.total_tokens if usage else None,
+                cache_creation_input_tokens=(
+                    usage.cache_creation_input_tokens if usage else None
+                ),
+                cache_read_input_tokens=(
+                    usage.cache_read_input_tokens if usage else None
+                ),
                 token_source=usage.source if usage else None,
                 request_body=request_text,
                 response_body=response_text,

@@ -127,7 +127,12 @@ export class MetricService {
       // Field-selected rather than `_count: true` / `_sum: true`: the latter
       // would pull in the summed BigInt `id`, which cannot be serialized.
       _count: { _all: true },
-      _sum: { input_tokens: true, output_tokens: true },
+      _sum: {
+        input_tokens: true,
+        output_tokens: true,
+        cache_creation_input_tokens: true,
+        cache_read_input_tokens: true,
+      },
     });
 
     // Sorted here rather than in SQL: `_sum` ordering accepts only a bare
@@ -144,6 +149,10 @@ export class MetricService {
                 request_count: row._count._all,
                 total_input_tokens: row._sum.input_tokens ?? 0,
                 total_output_tokens: row._sum.output_tokens ?? 0,
+                total_cache_creation_input_tokens:
+                  row._sum.cache_creation_input_tokens ?? 0,
+                total_cache_read_input_tokens:
+                  row._sum.cache_read_input_tokens ?? 0,
               },
             ],
       )

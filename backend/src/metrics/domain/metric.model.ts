@@ -37,6 +37,12 @@ export class HttpMetric {
   @Field(() => Int, { nullable: true })
   total_tokens!: number;
 
+  @Field(() => Int, { nullable: true })
+  cache_creation_input_tokens!: number;
+
+  @Field(() => Int, { nullable: true })
+  cache_read_input_tokens!: number;
+
   @Field()
   has_details!: boolean;
 }
@@ -84,6 +90,12 @@ export class ModelUsageAggregate {
 
   @Field(() => Int)
   total_output_tokens!: number;
+
+  @Field(() => Int)
+  total_cache_creation_input_tokens!: number;
+
+  @Field(() => Int)
+  total_cache_read_input_tokens!: number;
 }
 
 /**

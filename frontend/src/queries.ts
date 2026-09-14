@@ -14,6 +14,8 @@ export const GET_RECENT_METRICS = gql`
       input_tokens
       output_tokens
       total_tokens
+      cache_creation_input_tokens
+      cache_read_input_tokens
       has_details
     }
   }
@@ -26,6 +28,8 @@ export const GET_MODEL_USAGE = gql`
       request_count
       total_input_tokens
       total_output_tokens
+      total_cache_creation_input_tokens
+      total_cache_read_input_tokens
     }
   }
 `;
