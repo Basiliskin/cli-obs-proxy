@@ -55,7 +55,11 @@ const trafficOptions: { value: TrafficMode; label: string }[] = [
 function App() {
   const [filters, setFilters] = useState<MetricFilters>(initialFilters);
   const [selectedCall, setSelectedCall] = useState<RecentMetric | null>(null);
-  const { data: detailsData, loading: detailsLoading } =
+  const {
+    data: detailsData,
+    loading: detailsLoading,
+    error: detailsError,
+  } =
     useQuery<CallDetailsData>(GET_CALL_DETAILS, {
       variables: { id: selectedCall?.id ?? "0" },
       skip: !selectedCall,
@@ -285,6 +289,10 @@ function App() {
           </div>
           {detailsLoading ? (
             <div className="empty-state">Loading call...</div>
+          ) : detailsError ? (
+            <div className="empty-state">
+              Could not load call details: {detailsError.message}
+            </div>
           ) : detailsData?.callDetails ? (
             <div className="call-detail-grid">
               <CallPayload
