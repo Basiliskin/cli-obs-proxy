@@ -3,13 +3,28 @@
 export interface RecentMetric {
   id: string;
   observed_at: string;
+  method: string;
   host: string;
+  path: string;
   model: string | null;
   status: number | null;
   /** Null when no response arrived (client disconnect, DNS/TLS failure). */
   duration_ms: number | null;
   input_tokens: number | null;
   output_tokens: number | null;
+  has_details: boolean;
+}
+
+export interface CallDetails {
+  id: string;
+  observed_at: string;
+  method: string;
+  host: string;
+  path: string;
+  request_body: string | null;
+  response_body: string | null;
+  request_headers: string[];
+  response_headers: string[];
 }
 
 export interface MetricFacets {

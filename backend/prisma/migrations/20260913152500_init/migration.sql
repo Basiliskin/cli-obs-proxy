@@ -20,6 +20,10 @@ CREATE TABLE "http_metrics" (
     "output_tokens" INTEGER,
     "total_tokens" INTEGER,
     "token_source" TEXT,
+    "request_body" TEXT,
+    "response_body" TEXT,
+    "request_headers" JSONB,
+    "response_headers" JSONB,
 
     CONSTRAINT "http_metrics_pkey" PRIMARY KEY ("id")
 );

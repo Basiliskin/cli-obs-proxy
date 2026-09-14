@@ -36,6 +36,39 @@ export class HttpMetric {
 
   @Field(() => Int, { nullable: true })
   total_tokens!: number;
+
+  @Field()
+  has_details!: boolean;
+}
+
+@ObjectType()
+export class HttpCallDetails {
+  @Field(() => ID)
+  id!: string;
+
+  @Field()
+  observed_at!: Date;
+
+  @Field()
+  method!: string;
+
+  @Field()
+  host!: string;
+
+  @Field()
+  path!: string;
+
+  @Field(() => String, { nullable: true })
+  request_body!: string | null;
+
+  @Field(() => String, { nullable: true })
+  response_body!: string | null;
+
+  @Field(() => [String])
+  request_headers!: string[];
+
+  @Field(() => [String])
+  response_headers!: string[];
 }
 
 @ObjectType()

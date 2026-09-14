@@ -31,7 +31,11 @@ CREATE TABLE IF NOT EXISTS http_metrics (
     input_tokens INTEGER,
     output_tokens INTEGER,
     total_tokens INTEGER,
-    token_source TEXT
+    token_source TEXT,
+    request_body TEXT,
+    response_body TEXT,
+    request_headers JSONB,
+    response_headers JSONB
 );
 """
 
@@ -56,6 +60,10 @@ MIGRATIONS = [
     "ALTER TABLE http_metrics ADD COLUMN IF NOT EXISTS output_tokens INTEGER",
     "ALTER TABLE http_metrics ADD COLUMN IF NOT EXISTS total_tokens INTEGER",
     "ALTER TABLE http_metrics ADD COLUMN IF NOT EXISTS token_source TEXT",
+    "ALTER TABLE http_metrics ADD COLUMN IF NOT EXISTS request_body TEXT",
+    "ALTER TABLE http_metrics ADD COLUMN IF NOT EXISTS response_body TEXT",
+    "ALTER TABLE http_metrics ADD COLUMN IF NOT EXISTS request_headers JSONB",
+    "ALTER TABLE http_metrics ADD COLUMN IF NOT EXISTS response_headers JSONB",
 ]
 
 
@@ -127,6 +135,10 @@ class MetricRepository:
         output_tokens: Optional[int] = None,
         total_tokens: Optional[int] = None,
         token_source: Optional[str] = None,
+        request_body: Optional[str] = None,
+        response_body: Optional[str] = None,
+        request_headers: Optional[dict[str, str]] = None,
+        response_headers: Optional[dict[str, str]] = None,
     ) -> None:
         query = """
             INSERT INTO http_metrics (
@@ -145,9 +157,17 @@ class MetricRepository:
                 input_tokens,
                 output_tokens,
                 total_tokens,
-                token_source
+                token_source,
+                request_body,
+                response_body,
+                request_headers,
+                response_headers
             )
             VALUES (
+                %s,
+                %s,
+                %s,
+                %s,
                 %s,
                 %s,
                 %s,
@@ -187,7 +207,28 @@ class MetricRepository:
                     output_tokens,
                     total_tokens,
                     token_source,
+                    request_body,
+                    response_body,
+                    request_headers,
+                    response_headers,
                 ),
+            )
+
+            history_limit = max(int(os.getenv("CALL_HISTORY_LIMIT", "50")), 0)
+            await conn.execute(
+                """
+                UPDATE http_metrics
+                SET request_body = NULL,
+                    response_body = NULL,
+                    request_headers = NULL,
+                    response_headers = NULL
+                WHERE id NOT IN (
+                    SELECT id FROM http_metrics
+                    ORDER BY observed_at DESC, id DESC
+                    LIMIT %s
+                )
+                """,
+                (history_limit,),
             )
 
     async def close(self) -> None:

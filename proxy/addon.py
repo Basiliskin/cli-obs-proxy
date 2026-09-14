@@ -61,6 +61,9 @@ class ObservabilityAddon:
         except Exception:
             return None
 
+    def _headers(self, message) -> dict[str, str]:
+        return {str(key): str(value) for key, value in message.headers.items()}
+
     async def _record(self, flow: http.HTTPFlow, error: str | None):
         if not flow.request:
             return
@@ -130,6 +133,10 @@ class ObservabilityAddon:
                 output_tokens=usage.output_tokens if usage else None,
                 total_tokens=usage.total_tokens if usage else None,
                 token_source=usage.source if usage else None,
+                request_body=request_text,
+                response_body=response_text,
+                request_headers=self._headers(req),
+                response_headers=self._headers(res) if res else None,
             )
         except Exception as e:
             logger.error(f"Failed to save metric: {e}")

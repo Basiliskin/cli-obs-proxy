@@ -4,6 +4,7 @@ import { PrismaService } from '../infrastructure/prisma.service';
 import {
   MetricFacets,
   MetricFilters,
+  HttpCallDetails,
   ModelUsageAggregate,
 } from '../domain/metric.model';
 
@@ -52,7 +53,9 @@ export class MetricService {
   private requireModel(
     where: Prisma.HttpMetricWhereInput,
   ): Prisma.HttpMetricWhereInput {
-    return where.model === undefined ? { ...where, model: { not: null } } : where;
+    return where.model === undefined
+      ? { ...where, model: { not: null } }
+      : where;
   }
 
   async getRecentMetrics(limit: number, filters?: MetricFilters) {
@@ -65,7 +68,54 @@ export class MetricService {
     });
 
     // Map BigInt to String for GraphQL ID
-    return metrics.map((m) => ({ ...m, id: m.id.toString() }));
+    return metrics.map((m) => ({
+      ...m,
+      id: m.id.toString(),
+      has_details:
+        m.request_body !== null ||
+        m.response_body !== null ||
+        m.request_headers !== null ||
+        m.response_headers !== null,
+    }));
+  }
+
+  async getCallDetails(id: string): Promise<HttpCallDetails | null> {
+    const metric = await this.prisma.httpMetric.findUnique({
+      where: { id: BigInt(id) },
+    });
+
+    if (
+      !metric ||
+      (metric.request_body === null &&
+        metric.response_body === null &&
+        metric.request_headers === null &&
+        metric.response_headers === null)
+    ) {
+      return null;
+    }
+
+    const headers = (value: Prisma.JsonValue | null): string[] =>
+      value && typeof value === 'object' && !Array.isArray(value)
+        ? Object.entries(value).map(([key, headerValue]) => {
+            const text =
+              typeof headerValue === 'string'
+                ? headerValue
+                : JSON.stringify(headerValue);
+            return `${key}: ${text}`;
+          })
+        : [];
+
+    return {
+      id: metric.id.toString(),
+      observed_at: metric.observed_at,
+      method: metric.method,
+      host: metric.host,
+      path: metric.path,
+      request_body: metric.request_body,
+      response_body: metric.response_body,
+      request_headers: headers(metric.request_headers),
+      response_headers: headers(metric.response_headers),
+    };
   }
 
   async getModelUsageAggregates(
@@ -108,7 +158,9 @@ export class MetricService {
    * drop every other host from the dropdown and you could never switch away.
    */
   async getFacets(filters?: MetricFilters): Promise<MetricFacets> {
-    const scope = this.buildWhere(filters?.llmOnly ? { llmOnly: true } : undefined);
+    const scope = this.buildWhere(
+      filters?.llmOnly ? { llmOnly: true } : undefined,
+    );
 
     const [hosts, models, statuses] = await Promise.all([
       this.prisma.httpMetric.groupBy({

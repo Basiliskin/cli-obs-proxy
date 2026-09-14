@@ -1,5 +1,6 @@
 import { useQuery } from "@apollo/client/react";
 import { useMemo, useState } from "react";
+import { GET_CALL_DETAILS } from "./queries";
 import { TokenChart } from "./components/TokenChart";
 import { MetricsTable } from "./components/MetricsTable";
 import { UsageOverview } from "./components/UsageOverview";
@@ -9,6 +10,7 @@ import type {
   MetricFacets,
   MetricFilters,
   RecentMetric,
+  CallDetails,
   TrafficMode,
 } from "./metrics";
 import {
@@ -41,6 +43,10 @@ interface FacetsData {
   metricFacets: MetricFacets;
 }
 
+interface CallDetailsData {
+  callDetails: CallDetails | null;
+}
+
 const trafficOptions: { value: TrafficMode; label: string }[] = [
   { value: "llm", label: "LLM traffic" },
   { value: "all", label: "All traffic" },
@@ -48,6 +54,12 @@ const trafficOptions: { value: TrafficMode; label: string }[] = [
 
 function App() {
   const [filters, setFilters] = useState<MetricFilters>(initialFilters);
+  const [selectedCall, setSelectedCall] = useState<RecentMetric | null>(null);
+  const { data: detailsData, loading: detailsLoading } =
+    useQuery<CallDetailsData>(GET_CALL_DETAILS, {
+      variables: { id: selectedCall?.id ?? "0" },
+      skip: !selectedCall,
+    });
 
   const filterInput = useMemo(() => toFilterInput(filters), [filters]);
   const facetInput = useMemo(() => toFacetInput(filters), [filters]);
@@ -250,9 +262,69 @@ function App() {
           // them as stale); only a failure with nothing to show is an error state.
           error={Boolean(error) && !data}
           hasActiveFilters={hasActiveFilters}
+          onInspect={setSelectedCall}
         />
       </main>
+      {selectedCall && (
+        <dialog className="call-dialog" open>
+          <div className="dialog-heading">
+            <div>
+              <p className="eyebrow">Full call</p>
+              <h2>
+                {selectedCall.method} {selectedCall.path}
+              </h2>
+            </div>
+            <button
+              className="dialog-close"
+              type="button"
+              onClick={() => setSelectedCall(null)}
+              aria-label="Close call details"
+            >
+              Close
+            </button>
+          </div>
+          {detailsLoading ? (
+            <div className="empty-state">Loading call...</div>
+          ) : detailsData?.callDetails ? (
+            <div className="call-detail-grid">
+              <CallPayload
+                title="Request headers"
+                value={
+                  detailsData.callDetails.request_headers.join("\n") || "-"
+                }
+              />
+              <CallPayload
+                title="Request body"
+                value={detailsData.callDetails.request_body ?? "-"}
+              />
+              <CallPayload
+                title="Response headers"
+                value={
+                  detailsData.callDetails.response_headers.join("\n") || "-"
+                }
+              />
+              <CallPayload
+                title="Response body"
+                value={detailsData.callDetails.response_body ?? "-"}
+              />
+            </div>
+          ) : (
+            <div className="empty-state">
+              This call is outside the retained history window.
+            </div>
+          )}
+        </dialog>
+      )}
     </div>
+  );
+}
+
+function CallPayload({ title, value }: { title: string; value: string }) {
+  return (
+    <section className="call-payload">
+      <p className="eyebrow">{title}</p>
+      <pre>{value}</pre>
+    </section>
   );
 }
 

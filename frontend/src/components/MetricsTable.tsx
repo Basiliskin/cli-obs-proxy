@@ -6,6 +6,7 @@ interface MetricsTableProps {
   error: boolean;
   /** Distinguishes "nothing matches your filters" from "nothing recorded yet". */
   hasActiveFilters: boolean;
+  onInspect: (metric: RecentMetric) => void;
 }
 
 export function MetricsTable({
@@ -13,6 +14,7 @@ export function MetricsTable({
   loading,
   error,
   hasActiveFilters,
+  onInspect,
 }: MetricsTableProps) {
   if (loading)
     return (
@@ -54,6 +56,7 @@ export function MetricsTable({
                 <th>Status</th>
                 <th>Duration</th>
                 <th>Tokens (In/Out)</th>
+                <th>Inspect</th>
               </tr>
             </thead>
             <tbody>
@@ -74,6 +77,21 @@ export function MetricsTable({
                     {m.input_tokens
                       ? `${m.input_tokens} / ${m.output_tokens}`
                       : "-"}
+                  </td>
+                  <td>
+                    <button
+                      className="inspect-button"
+                      type="button"
+                      disabled={!m.has_details}
+                      onClick={() => onInspect(m)}
+                      title={
+                        m.has_details
+                          ? "Inspect full call"
+                          : "Full call not retained"
+                      }
+                    >
+                      {m.has_details ? "View" : "-"}
+                    </button>
                   </td>
                 </tr>
               ))}

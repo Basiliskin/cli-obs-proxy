@@ -25,6 +25,10 @@ model HttpMetric {
   output_tokens   Int?
   total_tokens    Int?
   token_source    String?
+  request_body    String?
+  response_body   String?
+  request_headers Json?
+  response_headers Json?
 
   @@map("http_metrics")
 }

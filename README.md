@@ -27,8 +27,10 @@ responses (including SSE streaming), and renders it as a live dashboard you can 
   tagged by source (`response_usage` or `sse_usage`).
 - **Persistent history:** All observations land in PostgreSQL with indexes on `observed_at`, `host`,
   and `model`.
-- **GraphQL API:** A NestJS + Prisma 7 + Apollo backend exposes two queries — `recentMetrics(limit)`
-  and `modelUsage` (per-model token aggregates).
+- **Call inspection:** The newest `CALL_HISTORY_LIMIT` calls retain request and response headers and
+  bodies for on-demand inspection from the dashboard; older metric summaries remain available.
+- **GraphQL API:** A NestJS + Prisma 7 + Apollo backend exposes `recentMetrics(limit)`,
+  `callDetails(id)`, and `modelUsage` (per-model token aggregates).
 - **Live dashboard:** A React + Vite + Tailwind + Recharts UI renders a filterable request log, a
   per-model token bar chart, a 7-day usage trend, and a weekday heatmap.
 - **Layered backend:** The NestJS service splits into `domain`, `application`, `infrastructure`, and
@@ -52,11 +54,11 @@ The first build pulls `postgres:16-alpine`, a Python 3.11 image with `mitmproxy`
 image that runs `prisma migrate deploy` + `node dist/main`, and a Node 20 + nginx image for the
 dashboard. On the host you get:
 
-| Service  | Port |
-|----------|------|
-| Frontend | `http://localhost` (nginx, port 80) |
-| Backend  | `http://localhost:3000/graphql` |
-| Proxy    | `http://localhost:8080` (mitmproxy) |
+| Service  | Port                                   |
+| -------- | -------------------------------------- |
+| Frontend | `http://localhost` (nginx, port 80)    |
+| Backend  | `http://localhost:3000/graphql`        |
+| Proxy    | `http://localhost:8080` (mitmproxy)    |
 | Postgres | `localhost:5432` (`cliobs` / `cliobs`) |
 
 ### macOS — install the mitmproxy CA cert
@@ -127,12 +129,13 @@ status. The charts update as new requests come in.
 
 The proxy reads these environment variables (set on the `proxy` service in `docker-compose.yml`):
 
-| Variable | Default | Effect |
-|----------|---------|--------|
-| `DATABASE_URL` | `postgresql://cliobs:cliobs@postgres:5432/cliobs` | Postgres connection string used by both the proxy and the backend. |
-| `MAX_TOKEN_PARSE_BYTES` | `10000000` | Caps the body size the token parser will scan. Larger payloads are truncated head + tail. |
-| `ENABLE_OPENAI_USAGE_INJECTION` | `false` | Opt-in: rewrite OpenAI-compatible streaming requests to add `stream_options.include_usage: true` so the final usage chunk is emitted. |
-| `METRICS_IGNORE_PATHS` | `/favicon.ico` | Comma-separated paths that are never recorded — browser probes that would otherwise flood the table. |
+| Variable                        | Default                                           | Effect                                                                                                                                |
+| ------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                  | `postgresql://cliobs:cliobs@postgres:5432/cliobs` | Postgres connection string used by both the proxy and the backend.                                                                    |
+| `MAX_TOKEN_PARSE_BYTES`         | `10000000`                                        | Caps the body size the token parser will scan. Larger payloads are truncated head + tail.                                             |
+| `CALL_HISTORY_LIMIT`            | `50`                                              | Number of newest calls whose request and response details are retained for dashboard inspection.                                      |
+| `ENABLE_OPENAI_USAGE_INJECTION` | `false`                                           | Opt-in: rewrite OpenAI-compatible streaming requests to add `stream_options.include_usage: true` so the final usage chunk is emitted. |
+| `METRICS_IGNORE_PATHS`          | `/favicon.ico`                                    | Comma-separated paths that are never recorded — browser probes that would otherwise flood the table.                                  |
 
 Body capture is controlled by mitmproxy's `stream_large_bodies` (set in `proxy/Dockerfile`, default
 `10m`). A streamed body is discarded and can never be parsed for token usage, so this threshold must

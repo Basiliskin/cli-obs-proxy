@@ -1,5 +1,30 @@
-1. docker compose up -d --build (docker compose down)
-2. Copy the cert out of the running proxy container:
+# Documentation
+
+See [PLAYBOOK.md](PLAYBOOK.md) for the end-to-end procedure after changing the
+Python proxy, Prisma schema, NestJS backend, or React frontend. It covers local
+validation, database migrations, Docker rebuilds, smoke checks, and recovery
+from stale images or persistent database volumes.
+
+## Quick Start
+
+```sh
+docker compose up -d --build
+```
+
+The backend container applies committed Prisma migrations before starting NestJS.
+For a local database that is already running, the equivalent manual check is:
+
+```sh
+cd backend
+npx prisma migrate deploy
+npx prisma migrate status
+```
+
+The remaining sections document certificate setup and direct SQL queries.
+
+## Certificate Setup
+
+1. Copy the certificate out of the running proxy container:
 
 ```
 docker compose cp proxy:/root/.mitmproxy/mitmproxy-ca-cert.pem ./mitmproxy-ca-cert.pem
@@ -9,13 +34,13 @@ The cert lives in the `mitmproxy_certs` volume, mounted at `/root/.mitmproxy` â€
 home directory, since the image runs as root. (`docker compose cp` needs the proxy
 container to be running.)
 
-3. Add it to your macOS Keychain and trust it:
+2. Add it to your macOS Keychain and trust it:
 
 ```
 security add-trusted-cert -d -r trustRoot -k ~/Library/Keychains/login.keychain-db ~/workspace/cli-obs-proxy/mitmproxy-ca-cert.pem
 ```
 
-4. add to ~/.zshrc
+3. Add the wrapper to `~/.zshrc`:
 
 ```
 # --- LLM observability wrapper ---

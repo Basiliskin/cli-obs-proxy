@@ -38,3 +38,19 @@ export const GET_METRIC_FACETS = gql`
     }
   }
 `;
+
+export const GET_CALL_DETAILS = gql`
+  query GetCallDetails($id: ID!) {
+    callDetails(id: $id) {
+      id
+      observed_at
+      method
+      host
+      path
+      request_body
+      response_body
+      request_headers
+      response_headers
+    }
+  }
+`;

@@ -1,7 +1,8 @@
-import { Resolver, Query, Args, Int } from '@nestjs/graphql';
+import { Resolver, Query, Args, Int, ID } from '@nestjs/graphql';
 import { MetricService } from '../application/metric.service';
 import {
   HttpMetric,
+  HttpCallDetails,
   MetricFacets,
   ModelUsageAggregate,
 } from '../domain/metric.model';
@@ -18,6 +19,11 @@ export class MetricResolver {
     filters?: MetricFiltersInput,
   ) {
     return this.metricService.getRecentMetrics(limit, toMetricFilters(filters));
+  }
+
+  @Query(() => HttpCallDetails, { name: 'callDetails', nullable: true })
+  async getCallDetails(@Args('id', { type: () => ID }) id: string) {
+    return this.metricService.getCallDetails(id);
   }
 
   @Query(() => [ModelUsageAggregate], { name: 'modelUsage' })
