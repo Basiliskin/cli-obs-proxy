@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Optional
 
 from psycopg_pool import AsyncConnectionPool
+from psycopg.types.json import Jsonb
 
 logger = logging.getLogger(__name__)
 
@@ -209,8 +210,8 @@ class MetricRepository:
                     token_source,
                     request_body,
                     response_body,
-                    request_headers,
-                    response_headers,
+                    Jsonb(request_headers) if request_headers is not None else None,
+                    Jsonb(response_headers) if response_headers is not None else None,
                 ),
             )
 

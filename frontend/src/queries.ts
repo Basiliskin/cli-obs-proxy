@@ -14,6 +14,7 @@ export const GET_RECENT_METRICS = gql`
       input_tokens
       output_tokens
       total_tokens
+      has_details
     }
   }
 `;
