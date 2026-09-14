@@ -59,11 +59,10 @@ function App() {
     data: detailsData,
     loading: detailsLoading,
     error: detailsError,
-  } =
-    useQuery<CallDetailsData>(GET_CALL_DETAILS, {
-      variables: { id: selectedCall?.id ?? "0" },
-      skip: !selectedCall,
-    });
+  } = useQuery<CallDetailsData>(GET_CALL_DETAILS, {
+    variables: { id: selectedCall?.id ?? "0" },
+    skip: !selectedCall,
+  });
 
   const filterInput = useMemo(() => toFilterInput(filters), [filters]);
   const facetInput = useMemo(() => toFacetInput(filters), [filters]);
