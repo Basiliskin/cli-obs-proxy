@@ -21,6 +21,14 @@ export class MetricResolver {
     return this.metricService.getRecentMetrics(limit, toMetricFilters(filters));
   }
 
+  @Query(() => [HttpMetric], { name: 'networkLogs' })
+  async getNetworkLogs(
+    @Args('limit', { type: () => Int, defaultValue: 500 }) limit: number,
+    @Args('domain', { type: () => String, nullable: true }) domain?: string,
+  ) {
+    return this.metricService.getNetworkLogs(limit, domain);
+  }
+
   @Query(() => HttpCallDetails, { name: 'callDetails', nullable: true })
   async getCallDetails(@Args('id', { type: () => ID }) id: string) {
     return this.metricService.getCallDetails(id);

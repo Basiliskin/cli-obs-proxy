@@ -73,5 +73,6 @@ type Query {
   """
   metricFacets(filters: MetricFiltersInput): MetricFacets!
   modelUsage(filters: MetricFiltersInput): [ModelUsageAggregate!]!
+  networkLogs(domain: String, limit: Int! = 500): [HttpMetric!]!
   recentMetrics(filters: MetricFiltersInput, limit: Int! = 50): [HttpMetric!]!
 }

@@ -10,6 +10,7 @@ import {
 
 /** Upper bound on `recentMetrics`, so the caller-supplied limit cannot request the whole table. */
 const MAX_RECENT_LIMIT = 1000;
+const MAX_NETWORK_LOG_LIMIT = 1000;
 
 @Injectable()
 export class MetricService {
@@ -64,10 +65,28 @@ export class MetricService {
       // The arg is caller-supplied, so clamp it rather than let one request ask
       // for the entire table.
       take: Math.min(Math.max(limit, 1), MAX_RECENT_LIMIT),
-      orderBy: { observed_at: 'desc' },
+      orderBy: [{ observed_at: 'desc' }, { id: 'desc' }],
     });
 
     // Map BigInt to String for GraphQL ID
+    return metrics.map((m) => ({
+      ...m,
+      id: m.id.toString(),
+      has_details:
+        m.request_body !== null ||
+        m.response_body !== null ||
+        m.request_headers !== null ||
+        m.response_headers !== null,
+    }));
+  }
+
+  async getNetworkLogs(limit: number, domain?: string) {
+    const metrics = await this.prisma.httpMetric.findMany({
+      where: domain ? { host: domain } : undefined,
+      take: Math.min(Math.max(limit, 1), MAX_NETWORK_LOG_LIMIT),
+      orderBy: [{ observed_at: 'desc' }, { id: 'desc' }],
+    });
+
     return metrics.map((m) => ({
       ...m,
       id: m.id.toString(),

@@ -21,6 +21,27 @@ export const GET_RECENT_METRICS = gql`
   }
 `;
 
+export const GET_NETWORK_LOGS = gql`
+  query GetNetworkLogs($limit: Int!, $domain: String) {
+    networkLogs(limit: $limit, domain: $domain) {
+      id
+      observed_at
+      method
+      host
+      path
+      status
+      duration_ms
+      model
+      input_tokens
+      output_tokens
+      total_tokens
+      cache_creation_input_tokens
+      cache_read_input_tokens
+      has_details
+    }
+  }
+`;
+
 export const GET_MODEL_USAGE = gql`
   query GetModelUsage($filters: MetricFiltersInput) {
     modelUsage(filters: $filters) {

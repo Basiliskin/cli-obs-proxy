@@ -5,6 +5,7 @@ import { TokenChart } from "./components/TokenChart";
 import { MetricsTable } from "./components/MetricsTable";
 import { UsageOverview } from "./components/UsageOverview";
 import { LiveStatus } from "./components/LiveStatus";
+import { NetworkLogsView } from "./components/NetworkLogsView";
 import { GET_METRIC_FACETS, GET_RECENT_METRICS } from "./queries";
 import type {
   MetricFacets,
@@ -53,6 +54,8 @@ const trafficOptions: { value: TrafficMode; label: string }[] = [
 ];
 
 function App() {
+  const [view, setView] = useState<"overview" | "network">("overview");
+  const [networkDomain, setNetworkDomain] = useState("");
   const [filters, setFilters] = useState<MetricFilters>(initialFilters);
   const [selectedCall, setSelectedCall] = useState<RecentMetric | null>(null);
   const {
@@ -149,9 +152,35 @@ function App() {
             <h1>CLI LLM Observability</h1>
           </div>
         </div>
-        <LiveStatus networkStatus={networkStatus} />
+        <div className="topbar-actions">
+          <nav className="view-switcher" aria-label="Dashboard view">
+            <button
+              type="button"
+              aria-current={view === "overview" ? "page" : undefined}
+              onClick={() => setView("overview")}
+            >
+              Overview
+            </button>
+            <button
+              type="button"
+              aria-current={view === "network" ? "page" : undefined}
+              onClick={() => setView("network")}
+            >
+              Network logs
+            </button>
+          </nav>
+          <LiveStatus networkStatus={networkStatus} />
+        </div>
       </header>
       <main>
+        {view === "network" ? (
+          <NetworkLogsView
+            domain={networkDomain}
+            onDomainChange={setNetworkDomain}
+            onInspect={setSelectedCall}
+          />
+        ) : (
+          <>
         <section className="intro-row">
           <div>
             <p className="eyebrow">Command center</p>
@@ -267,6 +296,8 @@ function App() {
           hasActiveFilters={hasActiveFilters}
           onInspect={setSelectedCall}
         />
+          </>
+        )}
       </main>
       {selectedCall && (
         <dialog className="call-dialog" open>
